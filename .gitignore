@@ -1,2 +1,6 @@
 venv
 .env
+user_list.json
+user_session.json
+.DS_Store
+__pycache__
