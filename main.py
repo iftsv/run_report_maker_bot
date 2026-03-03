@@ -11,6 +11,7 @@ from aiogram.utils.media_group import MediaGroupBuilder
 from dotenv import load_dotenv
 
 from states import ReportStates
+from utils import json_db
 
 # Load environment variables
 load_dotenv()
@@ -25,42 +26,83 @@ dp = Dispatcher(storage=MemoryStorage())
 
 # --- Utils ---
 
-def clean_nickname(nickname: str) -> str:
-    """Removes @ prefix from nickname if present."""
-    return nickname.lstrip("@").strip()
+def clean_tag(tag: str) -> str:
+    """Removes @ and # prefix from tag if present."""
+    return tag.lstrip("@#").strip()
 
 # --- Handlers ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("Hello! Let's create your run report. \n\nStep 1: Enter the challenge day number (e.g., 5).")
+    
+    user_id = str(message.from_user.id)
+    current_tag = json_db.get_user_tag(user_id)
+    
+    if current_tag is None:
+        await message.answer("Access Denied. You are not on the authorized user list.")
+        return
+
+    last_day = json_db.get_last_day(user_id)
+    suggested_day = last_day + 1
+    
+    kb = [[types.KeyboardButton(text=f"Day {suggested_day}")]]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, one_time_keyboard=True)
+    
+    await message.answer(
+        f"Hello! Let's create your run report. \n\n"
+        f"Step 1: Enter the challenge day number (suggested: {suggested_day}).",
+        reply_markup=keyboard
+    )
     await state.set_state(ReportStates.waiting_for_day)
 
 @dp.message(Command("cancel"))
 async def cmd_cancel(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("Report creation cancelled. Send /start to begin again.")
+    await message.answer("Report creation cancelled. Send /start to begin again.", reply_markup=types.ReplyKeyboardRemove())
 
 @dp.message(StateFilter(ReportStates.waiting_for_day))
 async def process_day(message: types.Message, state: FSMContext):
-    if not message.text or not message.text.isdigit():
+    text = message.text
+    if text.startswith("Day "):
+        day_str = text.split(" ")[1]
+    else:
+        day_str = text
+        
+    if not day_str.isdigit():
         await message.answer("Please enter a valid number for the day.")
         return
     
-    await state.update_data(day=message.text)
-    await message.answer("Step 2: Enter your nickname (for the hashtag).")
-    await state.set_state(ReportStates.waiting_for_nickname)
+    await state.update_data(day=day_str)
+    
+    user_id = str(message.from_user.id)
+    current_tag = json_db.get_user_tag(user_id)
+    
+    kb = [[types.KeyboardButton(text=current_tag)]]
+    keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, one_time_keyboard=True)
+    
+    await message.answer(
+        f"Step 2: Confirm or update your tag (current: #{current_tag}).",
+        reply_markup=keyboard
+    )
+    await state.set_state(ReportStates.waiting_for_tag)
 
-@dp.message(StateFilter(ReportStates.waiting_for_nickname))
-async def process_nickname(message: types.Message, state: FSMContext):
+@dp.message(StateFilter(ReportStates.waiting_for_tag))
+async def process_tag(message: types.Message, state: FSMContext):
     if not message.text:
-        await message.answer("Please enter your nickname.")
+        await message.answer("Please enter or confirm your tag.")
         return
     
-    nickname = clean_nickname(message.text)
-    await state.update_data(nickname=nickname)
-    await message.answer("Step 3: Upload the Strava screenshot.")
+    new_tag = clean_tag(message.text)
+    user_id = str(message.from_user.id)
+    old_tag = json_db.get_user_tag(user_id)
+    
+    if new_tag != old_tag:
+        json_db.update_user_tag(user_id, new_tag)
+        await message.answer(f"Tag updated to #{new_tag}.")
+    
+    await state.update_data(tag=new_tag)
+    await message.answer("Step 3: Upload the Strava screenshot.", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(ReportStates.waiting_for_strava)
 
 @dp.message(StateFilter(ReportStates.waiting_for_strava), F.photo)
@@ -102,12 +144,12 @@ async def process_generate_report(message: types.Message, state: FSMContext):
     data = await state.get_data()
     
     day = data.get("day")
-    nickname = data.get("nickname")
+    tag = data.get("tag")
     strava_photo = data.get("strava_photo")
     phrase_video = data.get("phrase_video")
     extra_media = data.get("extra_media", [])
     
-    caption = f"#день{day} #{nickname}"
+    caption = f"#день{day} #{tag}"
     
     # Build Media Group
     builder = MediaGroupBuilder(caption=caption)
@@ -125,9 +167,15 @@ async def process_generate_report(message: types.Message, state: FSMContext):
         elif media_item['type'] == 'video':
             builder.add_video(media=media_item['file_id'])
     
-    await message.answer_media_group(media=builder.build(), reply_markup=types.ReplyKeyboardRemove())
+    media_group = builder.build()
+    await message.answer_media_group(media=media_group, reply_markup=types.ReplyKeyboardRemove())
+    
+    # Update session - last reported day
+    user_id = str(message.from_user.id)
+    json_db.update_last_day(user_id, int(day))
+    
     await state.clear()
-    await message.answer("Report generated and sent back to you! Send /start to create another one.")
+    await message.answer("Report generated and sent back to you! Your session has been updated. Send /start for next time.")
 
 @dp.message(StateFilter(ReportStates.waiting_for_extra), F.photo | F.video)
 async def process_extra_media(message: types.Message, state: FSMContext):
