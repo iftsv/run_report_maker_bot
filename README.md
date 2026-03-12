@@ -24,4 +24,4 @@ A streamlined Telegram bot designed to collect daily running reports and format 
 
 ## Deployment
 
-For production setup instructions (Ubuntu Service, dependencies, etc.), please refer to the [Deployment Guide](deploy.md).
+For production setup instructions (Ubuntu Service, dependencies, etc.), please refer to the [Deployment Guide](deploy_systemd_service.md).
