@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # 1. Define variables (Update these to match your server)
-PROJECT_DIR="/home/user/run_report_maker_bot"
+USER_NAME=$1
+PROJECT_DIR="/home/$USER_NAME/run_report_maker_bot"
 VENV_PATH="$PROJECT_DIR/venv"
 SERVICE_NAME="running_bot.service"
 
