@@ -8,7 +8,6 @@ git clone <your-repo-url> /home/user/run_report_maker_bot
 cd /home/user/run_report_maker_bot
 ```
 
-
 ## 2. Set up environment
 ```bash
 python3 -m venv venv
