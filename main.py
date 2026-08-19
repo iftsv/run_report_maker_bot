@@ -24,6 +24,16 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+NOT_AUTHORIZED_MESSAGE = "You are not on the authorized user list yet. Please ask the admin of this bot to add you."
+
+@dp.message.outer_middleware()
+async def auth_middleware(handler, event: types.Message, data):
+    user_id = str(event.from_user.id)
+    if json_db.get_user_tag(user_id) is None:
+        await event.answer(NOT_AUTHORIZED_MESSAGE)
+        return
+    return await handler(event, data)
+
 # --- Utils ---
 
 def clean_tag(tag: str) -> str:
@@ -35,13 +45,8 @@ def clean_tag(tag: str) -> str:
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    
+
     user_id = str(message.from_user.id)
-    current_tag = json_db.get_user_tag(user_id)
-    
-    if current_tag is None:
-        await message.answer("Access Denied. You are not on the authorized user list.")
-        return
 
     last_day = json_db.get_last_day(user_id)
     suggested_day = last_day + 1
