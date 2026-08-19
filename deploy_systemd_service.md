@@ -4,8 +4,8 @@ This guide explains how to deploy the Run Report Maker Bot on an Ubuntu server.
 
 ## 1. Clone the repository
 ```bash
-git clone <your-repo-url> /home/user/running_bot
-cd /home/user/running_bot
+git clone <your-repo-url> /home/user/run_report_maker_bot
+cd /home/user/run_report_maker_bot
 ```
 
 ## 2. Set up environment

@@ -12,7 +12,7 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Execute deployment script on Server
       uses: appleboy/ssh-action@v1.0.3
@@ -20,7 +20,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         port: ${{ secrets.SERVER_PORT }}
         username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
+        password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           cd /home/${{ secrets.SERVER_USERNAME }}/run_report_maker_bot
           chmod +x deploy_run_report_maker_bot.sh
